@@ -87,11 +87,10 @@ class KS_SD(base_model):
         for i in range(len(X0)):
             self.X[i].assign(X0[i])
         #solve the SPDE
-        while (t < T - 0.5 * dt):
-            t += dt
+        for i in range(self.nsteps):
             #calculate noise U
             noise()
-            #solve the SPDE at time t
+            #solve the SPDE a time nsteps*dt
             self.usolver.solve()
             self.u0.assign(self.u1)
 
@@ -117,17 +116,17 @@ class KS_SD(base_model):
 #        for i in range(self.nsteps):
 #            dW_star = Function(self.V_)
 #            particle.append(dW_star)
-#s        return particle
+#        return particle
 
 
 
-    def randomize(self, X):
-        rg = self.rg
-        count = 0
-        for i in range(self.nsteps):
-               self.dXi.assign(rg.normal(self.V, 0., 1.0))
-               self.dW_solver.solve()
-               count += 1
-               X[count].assign(c1*X[count] + c2*self.dW_n)
-               if g:
-                    X[count] += gscale*g[count]
+#    def randomize(self, X):
+#        rg = self.rg
+#        count = 0
+#        for i in range(self.nsteps):
+#               self.dXi.assign(rg.normal(self.V, 0., 1.0))
+#               self.dW_solver.solve()
+#               count += 1
+#               X[count].assign(c1*X[count] + c2*self.dW_n)
+#               if g:
+#                    X[count] += gscale*g[count]
