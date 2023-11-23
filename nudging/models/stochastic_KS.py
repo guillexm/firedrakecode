@@ -100,7 +100,8 @@ class KS(base_model):
 
         # do the timestepping
         for step in range(self.nsteps):
-            # get noise (noise variables and lambdas TBD)
+            # get noise
+            noise()
             self.dW.assign(self.X[step+1])
             if self.lambdas:
                 self.dW += self.X[step+1+self.nsteps]*(self.dt)**0.5
