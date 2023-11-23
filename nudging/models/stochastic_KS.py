@@ -24,6 +24,8 @@ class KS(base_model):
         #for the finite difference approximation of the time derivative
         self.w0 = Function(self.V)
         self.x = SpatialCoordinate(self.mesh)
+        One = Function(V).assign(1.0)
+        self.Area = assemble(One*dx)
 
         #initial condition
         w0.project(0.2*2/(exp(self.x-403./15.) + exp(-self.x+403./15.))
@@ -144,20 +146,20 @@ class KS(base_model):
                 X[count] += gscale*g[count]
 
 
-#    def lambda_functional(self):
-#        nsteps = self.nsteps
-#        dt = self.dt
-#        for step in range(nsteps):
-#            lambda_step = self.X[nsteps + 1 + step]
-#            dW_step = self.X[1 + step]
-#            for cpt in range(self.n_noise_cpts):
-#                dlfunc = assemble(
-#                    lambda_step.sub(cpt)**2*dt/2*dx
-#                    - lambda_step.sub(cpt)*dW_step.sub(cpt)*dt**0.5*dx
-#                )
-#                dlfunc /= self.Area
-#                if step == 0 and cpt == 0:
-#                    lfunc = dlfunc
-#                else:
-#                    lfunc += dlfunc
-#        return lfunc
+    def lambda_functional(self):
+        nsteps = self.nsteps
+        dt = self.dt
+        for step in range(nsteps):
+            lambda_step = self.X[nsteps + 1 + step]
+            dW_step = self.X[1 + step]
+            for cpt in range(self.n_noise_cpts):
+                dlfunc = assemble(
+                    lambda_step.sub(cpt)**2*dt/2*dx
+                    - lambda_step.sub(cpt)*dW_step.sub(cpt)*dt**0.5*dx
+                )
+                dlfunc /= self.Area
+                if step == 0 and cpt == 0:
+                    lfunc = dlfunc
+                else:
+                    lfunc += dlfunc
+        return lfunc

@@ -27,15 +27,15 @@ class base_filter(object, metaclass=ABCMeta):
         self.nensemble = nensemble
         n_ensemble_partitions = len(nensemble)
         self.nspace = int(COMM_WORLD.size/n_ensemble_partitions)
-        assert(self.nspace*n_ensemble_partitions == COMM_WORLD.size)
+        #assert(self.nspace*n_ensemble_partitions == COMM_WORLD.size)
 
         self.subcommunicators = Ensemble(COMM_WORLD, self.nspace)
         # model needs to build the mesh in setup
         self.model.setup(self.subcommunicators.comm)
         if isinstance(nensemble, int):
             nensemble = tuple(nensemble for _ in range(self.subcommunicators.comm.size))
-        
-        # setting up ensemble 
+
+        # setting up ensemble
         self.ensemble_rank = self.subcommunicators.ensemble_comm.rank
         self.ensemble_size = self.subcommunicators.ensemble_comm.size
         self.ensemble = []
@@ -74,9 +74,9 @@ class base_filter(object, metaclass=ABCMeta):
                 rank -= 1
                 break
         return rank
-        
+
     def parallel_resample(self, dtheta=1):
-        
+
         self.potential_arr.synchronise(root=0)
         if self.ensemble_rank == 0:
             potentials = self.potential_arr.data()
@@ -100,7 +100,7 @@ class base_filter(object, metaclass=ABCMeta):
         self.s_copy = s_copy
 
         mpi_requests = []
-        
+
         for ilocal in range(self.nensemble[self.ensemble_rank]):
             iglobal = self.layout.transform_index(ilocal, itype='l',
                                              rtype='g')
@@ -147,7 +147,7 @@ class base_filter(object, metaclass=ABCMeta):
 
 
 
-        
+
     @abstractmethod
     def assimilation_step(self, y, log_likelihood):
         """
@@ -184,7 +184,7 @@ class bootstrap_filter(base_filter):
         # forward model step
         for i in range(N):
             self.model.randomize(self.ensemble[i])
-            self.model.run(self.ensemble[i], self.ensemble[i])   
+            self.model.run(self.ensemble[i], self.ensemble[i])
 
             Y = self.model.obs()
             self.potential_arr.dlocal[i] = assemble(log_likelihood(y,Y))
@@ -192,10 +192,12 @@ class bootstrap_filter(base_filter):
 
 
 class jittertemp_filter(base_filter):
-    def __init__(self, n_jitt=1, delta=None,
+    def __init__(self, n_temp, n_jitt=1, rho=0.9, delta=None,
                  verbose=False, MALA=False, nudging=False,
                  visualise_tape=False):
+        self.n_temp = n_temp
         self.delta = delta
+        self.rho = rho
         self.verbose=verbose
         self.MALA = MALA
         self.model_taped = False
@@ -381,7 +383,7 @@ class jittertemp_filter(base_filter):
                     Y = self.model.obs()
                     new_potentials[i] = exp(-theta*assemble(
                         log_likelihood(y,Y)))
-                    #accept reject of MALA and Jittering 
+                    #accept reject of MALA and Jittering
                     if l == 0:
                         potentials[i] = new_potentials[i]
                     else:
