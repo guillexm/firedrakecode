@@ -44,7 +44,7 @@ class KS(base_model):
         self.dW = self.dt**(1/2)*self.U
 
         #use backward Euler scheme for the variational form with space-time noise
-        L = ((self.w1-self.w0)/self.dt * self.phi + (self.w1.dx(0)).dx(0)*(self.phi.dx(0)).dx(0) - self.w1.dx(0)* self.phi.dx(0) -0.5 * self.w1*self.w1*self.phi.dx(0) + (self.W*self.phi)) * dx
+        L = ((self.w1-self.w0)/self.dt * self.phi + (self.w1.dx(0)).dx(0)*(self.phi.dx(0)).dx(0) - self.w1.dx(0)* self.phi.dx(0) -0.5 * self.w1*self.w1*self.phi.dx(0) + (self.dW*self.phi)) * dx
 
         #define a problem and solver over which we will iterate in a loop
         uprob = NonlinearVariationalProblem(L, self.w1)
@@ -57,7 +57,6 @@ class KS(base_model):
         self.X = self.allocate()
 
         # vertex only mesh for observations
-        #x_obs =np.linspace(0, 40,num=self.xpoints, endpoint=False) # This is better choice
         x_obs = np.arange(0.5,self.xpoints)
         x_obs_list = []
         for i in x_obs:
@@ -65,15 +64,15 @@ class KS(base_model):
         self.VOM = VertexOnlyMesh(self.mesh, x_obs_list)
         self.VVOM = FunctionSpace(self.VOM, "DG", 0)
 
-    def noise():
+
         # PCG64 random number generator
         pcg = PCG64(seed=123456789)
-        rg = RandomGenerator(pcg)
+        self.rg = RandomGenerator(pcg)
         #normal distribution
-        amplitude = Constant(0.05)
-        fx = rg.normal(V, 0.0, amplitude)
+        self.amplitude = Constant(0.05)
+        fx = Function(self.V_)
         #divide coeffs by area of each cell to get w
-        w = fx * 1000/40
+        w = fx / self.Area
         #we will approximate dW with w*dx
         #now calculate Matern field by solving the PDE with variational form
         #a(u, v) = nu * <v, dW>
@@ -88,7 +87,6 @@ class KS(base_model):
            {'mat_type': 'aij',
             'ksp_type': 'preonly',
             'pc_type': 'lu'})
-        noisesolver.solve()
 
     def run(self, X0, X1, operation = None):
         # copy input into model variables for taping
@@ -100,11 +98,14 @@ class KS(base_model):
 
         # do the timestepping
         for step in range(self.nsteps):
-            # get noise
-            noise()
-            self.dW.assign(self.X[step+1])
+            #assigning the noise variables stored in X[1,...]
+            #using fx instead of dW here
+            self.fx.assign(self.X[step+1])
+
             if self.lambdas:
-                self.dW += self.X[step+1+self.nsteps]*(self.dt)**0.5
+                self.fx += self.X[step+1+self.nsteps]*(self.dt)**0.5
+
+            noisesolver.solve()
             # advance in time
             self.usolver.solve()
             # copy output to input
@@ -124,15 +125,15 @@ class KS(base_model):
         return controls_list
 
     def obs(self):
-        m, u = self.w0.split()
+        u = w0
         Y = Function(self.VVOM)
         Y.interpolate(u)
         return Y
 
     def allocate(self):
-        particle = [Function(self.W)]
+        particle = [Function(self.V)]
         for i in range(self.nsteps):
-            dW = self.rg.normal(self.noise_space, 0., 1.0)
+            dW = Function(self.V_)
             particle.append(dW)
         return particle
 
@@ -141,8 +142,9 @@ class KS(base_model):
         count = 0
         for i in range(self.nsteps):
             count += 1
+            fx.assign(rg.normal(self.V_, 0.0, self.amplitude))
             X[count].assign(c1*X[count] + c2*rg.normal(
-                self.noise_space, 0., 1.0))
+                self.V_, 0., 0.5))
             if g:
                 X[count] += gscale*g[count]
 
